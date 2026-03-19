@@ -145,7 +145,9 @@ async def page_dashboard(request: Request):
 @app.get("/bodega", response_class=HTMLResponse)
 async def page_bodega(request: Request):
     ctx = base_context(request)
-    df  = cache_get("sheet"); df = df if df is not None else load_sheet()
+    
+    df = cache_get("sheet")
+    df = df if df is not None else load_sheet()
     cache_set("sheet", df)
 
     prod = ctx["producto_sel"]
@@ -158,7 +160,8 @@ async def page_bodega(request: Request):
     ctx["bodies"] = df_prod[df_prod["tipo"] == "Body"].to_dict("records") if not df_prod.empty else []
     ctx["ctas"]   = df_prod[df_prod["tipo"] == "CTA"].to_dict("records")  if not df_prod.empty else []
 
-    df_chars = cache_get("chars"); df_chars = df_chars if df_chars is not None else load_caracteristicas()
+    df_chars = cache_get("chars")
+    df_chars = df_chars if df_chars is not None else load_caracteristicas()
     cache_set("chars", df_chars)
     ctx["caracteristicas"] = get_chars_producto(prod, df, df_chars)
 
@@ -170,8 +173,10 @@ async def page_mixer(request: Request):
     if not ctx["master"]:
         return RedirectResponse("/bodega")
 
-    df = cache_get("sheet"); df = df if df is not None else load_sheet()
+    df = cache_get("sheet")
+    df = df if df is not None else load_sheet()
     cache_set("sheet", df)
+    
     prod    = ctx["producto_sel"]
     df_prod = df[df["producto"] == prod].copy() if not df.empty else pd.DataFrame()
 
@@ -187,7 +192,7 @@ async def page_mixer(request: Request):
     caracts = []
     if not df_prod.empty and "caracteristica" in df_prod.columns:
         caracts = sorted([c for c in df_prod[df_prod["tipo"]=="Body"]["caracteristica"].dropna().unique()
-                         if str(c).strip() and str(c).lower() != "nan"])
+                          if str(c).strip() and str(c).lower() != "nan"])
 
     ctx.update({
         "hooks": hooks, "bodies": bodies, "ctas": ctas,
@@ -199,8 +204,11 @@ async def page_mixer(request: Request):
 @app.get("/produccion", response_class=HTMLResponse)
 async def page_produccion(request: Request):
     ctx = base_context(request)
-    df_ads = cache_get("ads"); df_ads = df_ads if df_ads is not None else load_active_ads()
+    
+    df_ads = cache_get("ads")
+    df_ads = df_ads if df_ads is not None else load_active_ads()
     cache_set("ads", df_ads)
+    
     ctx["ads"] = df_ads.to_dict("records") if not df_ads.empty else []
     return templates.TemplateResponse("produccion.html", ctx)
 
@@ -222,7 +230,10 @@ async def page_subir(request: Request):
     ctx = base_context(request)
     if not ctx["master"]:
         return RedirectResponse("/bodega")
-    df = cache_get("sheet"); df = df if df is not None else load_sheet()
+        
+    df = cache_get("sheet")
+    df = df if df is not None else load_sheet()
+    
     ctx["tipos_body"] = get_chars_producto(ctx["producto_sel"], df)
     return templates.TemplateResponse("subir.html", ctx)
 
@@ -241,9 +252,14 @@ async def page_productos(request: Request):
     ctx = base_context(request)
     if not ctx["master"]:
         return RedirectResponse("/bodega")
-    df = cache_get("sheet"); df = df if df is not None else load_sheet()
-    df_chars = cache_get("chars"); df_chars = df_chars if df_chars is not None else load_caracteristicas()
+        
+    df = cache_get("sheet")
+    df = df if df is not None else load_sheet()
+    
+    df_chars = cache_get("chars")
+    df_chars = df_chars if df_chars is not None else load_caracteristicas()
     cache_set("chars", df_chars)
+    
     ctx["df_chars"] = df_chars.to_dict("records") if not df_chars.empty else []
     return templates.TemplateResponse("productos.html", ctx)
 
