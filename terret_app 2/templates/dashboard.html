@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-wide">
+
+  <div class="flex-between mb-16">
+    <div>
+      <h1>Dashboard</h1>
+      <p class="page-desc">Triangulación de rendimiento por anuncio activo</p>
+    </div>
+    <div class="flex gap-8">
+      <button class="btn btn-secondary btn-sm" onclick="importarCSVMeta()">
+        <svg viewBox="0 0 16 16" width="13" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 10v3h12v-3M8 2v8M5 7l3 3 3-3"/></svg>
+        Importar CSV Meta
+      </button>
+      <button class="btn btn-secondary btn-sm" onclick="syncMeta()">
+        <svg viewBox="0 0 16 16" width="13" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 8A5 5 0 113 8M13 8V5M13 8h-3"/></svg>
+        Sync Meta API
+      </button>
+    </div>
+  </div>
+
+  <!-- Métricas globales -->
+  <div class="metrics-grid" id="metrics-grid">
+    <div class="metric-card">
+      <div class="metric-label">Inversión Total</div>
+      <div class="metric-value" id="m-inversion">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Ingresos</div>
+      <div class="metric-value green" id="m-ingresos">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">ROAS Global</div>
+      <div class="metric-value" id="m-roas">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Compras</div>
+      <div class="metric-value" id="m-compras">—</div>
+    </div>
+  </div>
+
+  <!-- Pipeline -->
+  <div class="pipeline-grid mb-24" id="pipeline-grid">
+    {% for estado in ESTADOS %}
+    <div class="pipeline-card {{ 'listo' if estado == 'Listo' else '' }}">
+      <div class="pipeline-count" id="pipe-{{ estado }}">0</div>
+      <div class="pipeline-label">{{ estado }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Panel de decisiones -->
+  <div class="flex-between mb-16">
+    <h2>Panel de Decisiones</h2>
+    <div class="flex gap-8">
+      <button class="btn btn-secondary btn-sm" onclick="filtrarDecision('todos')" id="f-todos" style="border-color:var(--border2);">Todos</button>
+      <button class="btn btn-secondary btn-sm" onclick="filtrarDecision('escalar')" id="f-escalar">
+        <span class="sem-dot" style="width:6px;height:6px;border-radius:99px;background:var(--green);display:inline-block;"></span> Escalar
+      </button>
+      <button class="btn btn-secondary btn-sm" onclick="filtrarDecision('optimizar')" id="f-optimizar">
+        <span class="sem-dot" style="width:6px;height:6px;border-radius:99px;background:var(--amber);display:inline-block;"></span> Optimizar
+      </button>
+      <button class="btn btn-secondary btn-sm" onclick="filtrarDecision('pausar')" id="f-pausar">
+        <span class="sem-dot" style="width:6px;height:6px;border-radius:99px;background:var(--red);display:inline-block;"></span> Pausar
+      </button>
+    </div>
+  </div>
+
+  <div id="decision-list">
+    <div class="card-ghost">
+      <span class="text-xs text-muted text-mono">Cargando datos...</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal CSV -->
+<div id="modal-csv" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9999;align-items:center;justify-content:center;">
+  <div class="card" style="width:480px;max-width:90vw;">
+    <div class="flex-between mb-16">
+      <h2>Importar CSV de Meta</h2>
+      <button class="btn btn-secondary btn-sm btn-icon" onclick="cerrarModal()">
+        <svg viewBox="0 0 16 16" width="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+      </button>
+    </div>
+    <div class="form-group">
+      <label class="label">Archivo CSV exportado de Meta Ads Manager</label>
+      <input type="file" id="csv-file" accept=".csv" onchange="previewCSV(this)">
+    </div>
+    <div id="csv-preview" style="display:none;">
+      <div class="alert alert-info mb-8" id="csv-info"></div>
+      <div class="table-wrap" style="max-height:240px;overflow-y:auto;" id="csv-table-wrap"></div>
+    </div>
+    <div id="csv-error" class="alert alert-error" style="display:none;"></div>
+    <div class="flex gap-8 mt-16">
+      <button class="btn btn-secondary" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn btn-primary" id="btn-aplicar" onclick="aplicarCSV()" style="display:none;">Aplicar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _csvRows = [];
+let _filtroActivo = 'todos';
+
+async function cargarDashboard() {
+  const data = await apiGet('dashboard-data');
+  const ads = data.ads || [];
+  const stats = data.stats || {};
+  const pipeline = data.pipeline || {};
+
+  // Métricas
+  document.getElementById('m-inversion').textContent = stats.inversion
+    ? `$${(stats.inversion/1000).toFixed(0)}K`  : '—';
+  document.getElementById('m-ingresos').textContent  = stats.ingresos
+    ? `$${(stats.ingresos/1000).toFixed(0)}K`   : '—';
+  const roas = stats.roas || 0;
+  const rEl = document.getElementById('m-roas');
+  rEl.textContent = roas ? roas.toFixed(2) + 'x' : '—';
+  rEl.classList.toggle('green', roas >= 2);
+  rEl.classList.toggle('red',   roas > 0 && roas < 1);
+  document.getElementById('m-compras').textContent = stats.compras || '—';
+
+  // Pipeline
+  ['Pendiente','Listo','Publicado','Pausado'].forEach(e => {
+    const el = document.getElementById(`pipe-${e}`);
+    if (el) el.textContent = pipeline[e] || 0;
+  });
+
+  // Decisiones
+  renderDecisiones(ads);
+}
+
+function semaforo(val, thresholds, labels) {
+  const [hi, lo] = thresholds;
+  if (val >= hi) return 'green';
+  if (val >= lo) return 'amber';
+  return 'red';
+}
+
+function diagnosticar(ad) {
+  const hr   = parseFloat(ad.hook_rate  || 0);
+  const hold = parseFloat(ad.hold_rate  || 0);
+  const ctr  = parseFloat(ad.ctr       || 0);
+  const roas = parseFloat(ad.roas      || 0);
+  const inv  = parseFloat(ad.inversion || 0);
+
+  if (inv === 0) return { clase: 'optimizar', tag: 'Sin datos', diag: 'Aún no hay métricas cargadas.' };
+
+  const sHR   = semaforo(hr,   [25, 15]);
+  const sHold = semaforo(hold, [40, 25]);
+  const sCTR  = semaforo(ctr,  [1.5, 0.8]);
+  const sROAS = semaforo(roas, [2, 1]);
+
+  const verdes = [sHR, sHold, sCTR, sROAS].filter(s => s === 'green').length;
+  const rojos  = [sHR, sHold, sCTR, sROAS].filter(s => s === 'red').length;
+
+  let clase = 'optimizar', tag = 'Optimizar', diag = '';
+
+  if (roas >= 2 && verdes >= 3) {
+    clase = 'escalar'; tag = 'Escalar';
+    diag = 'Rendimiento sólido en todas las métricas. Aumentar presupuesto.';
+  } else if (rojos >= 3 || (roas > 0 && roas < 1)) {
+    clase = 'pausar'; tag = 'Pausar';
+    if (sHR === 'red') diag = 'Hook débil: el creativo no captura atención.';
+    else if (sHold === 'red') diag = 'Retención baja: el Body no engancha.';
+    else diag = 'ROAS negativo. Pausar y revisar targeting o creativos.';
+  } else {
+    if (sHR === 'red')   diag = 'Hook débil — probar nuevo creativo de apertura.';
+    else if (sHold === 'red') diag = 'Retención baja — acortar o fortalecer el Body.';
+    else if (sCTR === 'red')  diag = 'CTR bajo — revisar CTA o copy del anuncio.';
+    else diag = 'En proceso de optimización.';
+  }
+
+  return { clase, tag, diag,
+    sems: { hr: sHR, hold: sHold, ctr: sCTR, roas: sROAS } };
+}
+
+function renderDecisiones(ads) {
+  const list = document.getElementById('decision-list');
+  const pub = ads.filter(a => a.estado === 'Publicado');
+
+  if (!pub.length) {
+    list.innerHTML = '<div class="card-ghost"><span class="text-xs text-muted text-mono">No hay anuncios publicados con métricas</span></div>';
+    return;
+  }
+
+  const filtrados = _filtroActivo === 'todos' ? pub
+    : pub.filter(a => diagnosticar(a).clase === _filtroActivo);
+
+  if (!filtrados.length) {
+    list.innerHTML = '<div class="card-ghost"><span class="text-xs text-muted text-mono">Sin resultados para este filtro</span></div>';
+    return;
+  }
+
+  list.innerHTML = filtrados.map(ad => {
+    const { clase, tag, diag, sems } = diagnosticar(ad);
+    const inv  = parseFloat(ad.inversion || 0);
+    const roas = parseFloat(ad.roas || 0);
+    return `
+    <div class="decision-card ${clase}" data-clase="${clase}">
+      <div class="decision-header">
+        <div class="decision-name" title="${ad.nombre}">${ad.nombre}</div>
+        <span class="decision-tag ${clase}">${tag}</span>
+      </div>
+      <div class="decision-metrics">
+        <div class="decision-metric">
+          <div class="dm-label">Hook Rate</div>
+          <div class="dm-value" style="color:var(--${sems?.hr||'text'})">${parseFloat(ad.hook_rate||0).toFixed(1)}%</div>
+        </div>
+        <div class="decision-metric">
+          <div class="dm-label">Hold Rate</div>
+          <div class="dm-value" style="color:var(--${sems?.hold||'text'})">${parseFloat(ad.hold_rate||0).toFixed(1)}%</div>
+        </div>
+        <div class="decision-metric">
+          <div class="dm-label">CTR</div>
+          <div class="dm-value" style="color:var(--${sems?.ctr||'text'})">${parseFloat(ad.ctr||0).toFixed(2)}%</div>
+        </div>
+        <div class="decision-metric">
+          <div class="dm-label">ROAS</div>
+          <div class="dm-value" style="color:var(--${sems?.roas||'text'})">${roas.toFixed(2)}x</div>
+        </div>
+        <div class="decision-metric">
+          <div class="dm-label">Inversión</div>
+          <div class="dm-value">$${inv >= 1000 ? (inv/1000).toFixed(1)+'K' : inv.toFixed(0)}</div>
+        </div>
+      </div>
+      <div class="decision-diag">${diag}</div>
+    </div>`;
+  }).join('');
+}
+
+function filtrarDecision(f) {
+  _filtroActivo = f;
+  ['todos','escalar','optimizar','pausar'].forEach(k => {
+    document.getElementById(`f-${k}`)?.style.setProperty('border-color', k === f ? 'var(--border2)' : 'var(--border)');
+  });
+  apiGet('dashboard-data').then(d => renderDecisiones(d.ads || []));
+}
+
+async function syncMeta() {
+  toast('Sincronizando con Meta API...', 'info');
+  const r = await apiPost('meta/sync', {});
+  toast(r.ok ? `Sincronizado: ${r.actualizados||0} anuncios` : `Error: ${r.error}`, r.ok ? 'success' : 'error');
+  if (r.ok) cargarDashboard();
+}
+
+function importarCSVMeta() {
+  const m = document.getElementById('modal-csv');
+  m.style.display = 'flex';
+  document.getElementById('csv-preview').style.display = 'none';
+  document.getElementById('csv-error').style.display = 'none';
+  document.getElementById('btn-aplicar').style.display = 'none';
+  document.getElementById('csv-file').value = '';
+  _csvRows = [];
+}
+
+function cerrarModal() {
+  document.getElementById('modal-csv').style.display = 'none';
+}
+
+async function previewCSV(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  const r = await apiPostForm('meta/import-csv', fd);
+  if (!r.ok) {
+    document.getElementById('csv-error').style.display = 'block';
+    document.getElementById('csv-error').textContent = r.error;
+    return;
+  }
+  _csvRows = r.preview || [];
+  document.getElementById('csv-info').textContent = `${r.total} anuncios listos para importar`;
+  document.getElementById('csv-preview').style.display = 'block';
+  document.getElementById('csv-error').style.display = 'none';
+  document.getElementById('btn-aplicar').style.display = 'inline-flex';
+
+  const rows = _csvRows.slice(0,10);
+  document.getElementById('csv-table-wrap').innerHTML = `
+    <table><thead><tr>
+      <th>Anuncio</th><th>Inversión</th><th>Compras</th><th>Hook%</th><th>Hold%</th><th>CTR</th><th>ROAS</th>
+    </tr></thead><tbody>
+    ${rows.map(r => `<tr>
+      <td class="truncate" style="max-width:160px;" title="${r['Nombre del anuncio']}">${r['Nombre del anuncio']}</td>
+      <td class="mono">$${parseFloat(r.inversion||0).toFixed(0)}</td>
+      <td class="mono">${r.compras||0}</td>
+      <td class="mono">${parseFloat(r.hook_rate||0).toFixed(1)}%</td>
+      <td class="mono">${parseFloat(r.hold_rate||0).toFixed(1)}%</td>
+      <td class="mono">${parseFloat(r.ctr||0).toFixed(2)}%</td>
+      <td class="mono">${parseFloat(r.roas||0).toFixed(2)}</td>
+    </tr>`).join('')}
+    </tbody></table>`;
+}
+
+async function aplicarCSV() {
+  if (!_csvRows.length) return;
+  const btn = document.getElementById('btn-aplicar');
+  btn.textContent = 'Aplicando...';
+  btn.disabled = true;
+  const r = await apiPost('meta/import-csv/apply', { rows: _csvRows });
+  btn.textContent = 'Aplicar'; btn.disabled = false;
+  if (r.ok) {
+    cerrarModal();
+    toast(`${r.actualizados} anuncios actualizados`, 'success');
+    if (r.no_match?.length) toast(`Sin match: ${r.no_match.slice(0,3).join(', ')}`, 'info', 5000);
+    cargarDashboard();
+  } else {
+    toast('Error: ' + r.error, 'error');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', cargarDashboard);
+document.getElementById('modal-csv').addEventListener('click', function(e) {
+  if (e.target === this) cerrarModal();
+});
+</script>
+{% endblock %}
