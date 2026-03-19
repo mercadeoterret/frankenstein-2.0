@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-wide" style="max-width:860px;">
+
+  <div class="flex-between mb-16">
+    <div>
+      <h1>Brief</h1>
+      <p class="page-desc">Guía de producción para <span class="text-mono">{{ producto_sel }}</span></p>
+    </div>
+    {% if master %}
+    <button class="btn btn-primary btn-sm" onclick="guardarBrief()">
+      <svg viewBox="0 0 16 16" width="13" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8l4 4 6-6"/></svg>
+      Guardar
+    </button>
+    {% endif %}
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+
+    <div class="card">
+      <div class="label">Hooks — Ideas y referencias</div>
+      {% if master %}
+      <textarea id="brief-hooks" rows="8" placeholder="Describe los conceptos para hooks de este producto...&#10;&#10;Ej:&#10;- Problema que resuelve&#10;- Situación de uso&#10;- Frase de apertura&#10;- Referencia de competencia">{{ brief.get('hooks', '') }}</textarea>
+      {% else %}
+      <div class="text-sm" style="white-space:pre-wrap;color:var(--text2);">{{ brief.get('hooks', 'Sin brief') }}</div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="label">Bodies — Argumentos y beneficios</div>
+      {% if master %}
+      <textarea id="brief-bodies" rows="8" placeholder="Lista los argumentos clave para el Body:&#10;&#10;- Beneficio principal&#10;- Diferenciadores&#10;- Características técnicas&#10;- Testimonios o claims">{{ brief.get('bodies', '') }}</textarea>
+      {% else %}
+      <div class="text-sm" style="white-space:pre-wrap;color:var(--text2);">{{ brief.get('bodies', 'Sin brief') }}</div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="label">CTAs — Llamadas a la acción</div>
+      {% if master %}
+      <textarea id="brief-ctas" rows="8" placeholder="Define los CTAs:&#10;&#10;- Urgencia o escasez&#10;- Oferta o descuento&#10;- Beneficio de comprar hoy&#10;- Texto del botón">{{ brief.get('ctas', '') }}</textarea>
+      {% else %}
+      <div class="text-sm" style="white-space:pre-wrap;color:var(--text2);">{{ brief.get('ctas', 'Sin brief') }}</div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="label">Guiones y referencias adicionales</div>
+      {% if master %}
+      <textarea id="brief-guiones" rows="8" placeholder="Guiones, referencias de competencia, links, notas del creador...">{{ brief.get('guiones', '') }}</textarea>
+      {% else %}
+      <div class="text-sm" style="white-space:pre-wrap;color:var(--text2);">{{ brief.get('guiones', 'Sin brief') }}</div>
+      {% endif %}
+    </div>
+
+  </div>
+
+  {% if brief %}
+  <div class="flex gap-8 mt-16" style="justify-content:flex-end;">
+    <span class="text-xs text-mono text-muted">Última actualización guardada en Google Sheets</span>
+  </div>
+  {% endif %}
+
+</div>
+
+{% if master %}
+<script>
+async function guardarBrief() {
+  const r = await apiPost('brief/guardar', {
+    producto: '{{ producto_sel }}',
+    hooks:    document.getElementById('brief-hooks')?.value || '',
+    bodies:   document.getElementById('brief-bodies')?.value || '',
+    ctas:     document.getElementById('brief-ctas')?.value || '',
+    guiones:  document.getElementById('brief-guiones')?.value || '',
+  });
+  toast(r.ok ? 'Brief guardado' : 'Error al guardar', r.ok ? 'success' : 'error');
+}
+</script>
+{% endif %}
+{% endblock %}

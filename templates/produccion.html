@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-wide">
+
+  <div class="flex-between mb-16">
+    <div>
+      <h1>Producción</h1>
+      <p class="page-desc">Pipeline de anuncios por estado</p>
+    </div>
+    {% if master %}
+    <div class="flex gap-8">
+      <button class="btn btn-secondary btn-sm" onclick="syncMeta()">
+        <svg viewBox="0 0 16 16" width="13" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 8A5 5 0 113 8M13 8V5M13 8h-3"/></svg>
+        Sync Meta
+      </button>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="kanban-grid" id="kanban">
+    {% set estados_config = [
+      ('Pendiente', ''),
+      ('Listo',     'listo'),
+      ('Publicado', ''),
+      ('Pausado',   '')
+    ] %}
+    {% for estado, css_class in estados_config %}
+    {% set ads_estado = ads | selectattr('estado', 'equalto', estado) | list %}
+    <div class="kanban-col {{ css_class }}" id="col-{{ estado }}">
+      <div class="kanban-col-header">
+        <span class="kanban-col-title">{{ estado }}</span>
+        <span class="kanban-col-count">{{ ads_estado | length }}</span>
+      </div>
+      <div id="cards-{{ estado }}">
+        {% for ad in ads_estado %}
+        <div class="kanban-card" onclick="abrirDetalle('{{ ad.nombre | replace("'", "\\'") }}')"
+             data-nombre="{{ ad.nombre }}" data-estado="{{ estado }}">
+          <div class="kanban-card-name">{{ ad.nombre }}</div>
+          <div class="kanban-card-sub">
+            {{ ad.hook or '—' }} · {{ ad.cta or '—' }}
+          </div>
+          <div class="kanban-card-meta">
+            <div class="flex gap-6">
+              {% if ad.hook_rate %}
+              <span class="sem {% if ad.hook_rate|float >= 25 %}green{% elif ad.hook_rate|float >= 15 %}amber{% else %}red{% endif %}">
+                <span class="sem-dot"></span>{{ "%.0f"|format(ad.hook_rate|float) }}%
+              </span>
+              {% endif %}
+              {% if ad.roas %}
+              <span class="roas-badge">{{ "%.1f"|format(ad.roas|float) }}x</span>
+              {% endif %}
+            </div>
+            {% if master %}
+            <div class="flex gap-4" onclick="event.stopPropagation()">
+              {% if estado != 'Pendiente' %}
+              <button class="btn btn-secondary btn-sm btn-icon" title="Mover a Pendiente" onclick="moverEstado('{{ ad.nombre }}','Pendiente')">
+                <svg viewBox="0 0 16 16" width="11" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 4L6 8l4 4"/></svg>
+              </button>
+              {% endif %}
+              {% if estado != 'Listo' %}
+              <button class="btn btn-secondary btn-sm btn-icon" title="Marcar Listo" onclick="moverEstado('{{ ad.nombre }}','Listo')">
+                <svg viewBox="0 0 16 16" width="11" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8l4 4 6-6"/></svg>
+              </button>
+              {% endif %}
+              {% if estado != 'Publicado' %}
+              <button class="btn btn-secondary btn-sm btn-icon" title="Marcar Publicado" onclick="pedirURLPublicar('{{ ad.nombre }}')">
+                <svg viewBox="0 0 16 16" width="11" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>
+              </button>
+              {% endif %}
+              {% if estado != 'Pausado' %}
+              <button class="btn btn-danger btn-sm btn-icon" title="Pausar" onclick="moverEstado('{{ ad.nombre }}','Pausado')">
+                <svg viewBox="0 0 16 16" width="11" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 4h2v8H5zM9 4h2v8H9z"/></svg>
+              </button>
+              {% endif %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% else %}
+        <div class="card-ghost" style="padding:16px;">
+          <span class="text-xs text-muted text-mono">Sin anuncios</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+
+<!-- Modal detalle anuncio -->
+<div id="modal-detalle" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9999;align-items:center;justify-content:center;">
+  <div class="card" style="width:520px;max-width:92vw;max-height:85vh;overflow-y:auto;">
+    <div class="flex-between mb-16">
+      <h2 id="det-nombre" style="font-size:0.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:380px;">—</h2>
+      <button class="btn btn-secondary btn-sm btn-icon" onclick="cerrarDetalle()">
+        <svg viewBox="0 0 16 16" width="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+      </button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;" class="mb-16">
+      <div class="card-sm"><div class="label">Hook</div><div class="text-sm" id="det-hook">—</div></div>
+      <div class="card-sm"><div class="label">Body</div><div class="text-sm" id="det-body">—</div></div>
+      <div class="card-sm"><div class="label">CTA</div><div class="text-sm" id="det-cta">—</div></div>
+      <div class="card-sm"><div class="label">Estado</div><div class="text-sm" id="det-estado">—</div></div>
+    </div>
+
+    <div class="label">Métricas</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;" class="mb-16">
+      <div class="metric-card" style="padding:10px;">
+        <div class="metric-label">Hook Rate</div>
+        <div class="metric-value" id="det-hookrate" style="font-size:1.1rem;">—</div>
+      </div>
+      <div class="metric-card" style="padding:10px;">
+        <div class="metric-label">Hold Rate</div>
+        <div class="metric-value" id="det-holdrate" style="font-size:1.1rem;">—</div>
+      </div>
+      <div class="metric-card" style="padding:10px;">
+        <div class="metric-label">CTR</div>
+        <div class="metric-value" id="det-ctr" style="font-size:1.1rem;">—</div>
+      </div>
+      <div class="metric-card" style="padding:10px;">
+        <div class="metric-label">ROAS</div>
+        <div class="metric-value" id="det-roas" style="font-size:1.1rem;">—</div>
+      </div>
+    </div>
+
+    {% if master %}
+    <hr class="mb-16">
+    <div class="label">Actualizar Métricas Manualmente</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" class="mb-16">
+      <div class="form-group" style="margin:0;"><label class="label">Inversión (COP)</label><input type="number" id="inp-inversion" placeholder="0"></div>
+      <div class="form-group" style="margin:0;"><label class="label">Compras</label><input type="number" id="inp-compras" placeholder="0"></div>
+      <div class="form-group" style="margin:0;"><label class="label">CTR %</label><input type="number" id="inp-ctr" placeholder="0.00" step="0.01"></div>
+      <div class="form-group" style="margin:0;"><label class="label">ROAS</label><input type="number" id="inp-roas" placeholder="0.00" step="0.01"></div>
+      <div class="form-group" style="margin:0;"><label class="label">Hook Rate %</label><input type="number" id="inp-hookrate" placeholder="0.00" step="0.01"></div>
+      <div class="form-group" style="margin:0;"><label class="label">Hold Rate %</label><input type="number" id="inp-holdrate" placeholder="0.00" step="0.01"></div>
+    </div>
+    <div class="flex gap-8">
+      <button class="btn btn-secondary" onclick="cerrarDetalle()">Cerrar</button>
+      <button class="btn btn-primary" onclick="guardarMetricas()">Guardar Métricas</button>
+      <button class="btn btn-danger" onclick="eliminarAnuncio()">Eliminar</button>
+    </div>
+    {% else %}
+    <button class="btn btn-secondary btn-full" onclick="cerrarDetalle()">Cerrar</button>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Modal URL publicar -->
+<div id="modal-url" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9999;align-items:center;justify-content:center;">
+  <div class="card" style="width:400px;max-width:92vw;">
+    <h2 class="mb-16">Marcar como Publicado</h2>
+    <div class="form-group">
+      <label class="label">URL del anuncio en Meta (opcional)</label>
+      <input type="text" id="inp-url-publicar" placeholder="https://...">
+    </div>
+    <div class="flex gap-8">
+      <button class="btn btn-secondary" onclick="document.getElementById('modal-url').style.display='none'">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarPublicar()">Publicar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _detalleNombre = null;
+let _publicarNombre = null;
+
+const ADS = {{ ads | tojson }};
+
+function abrirDetalle(nombre) {
+  const ad = ADS.find(a => a.nombre === nombre);
+  if (!ad) return;
+  _detalleNombre = nombre;
+  document.getElementById('det-nombre').textContent = nombre;
+  document.getElementById('det-hook').textContent   = ad.hook  || '—';
+  document.getElementById('det-body').textContent   = ad.body  || '—';
+  document.getElementById('det-cta').textContent    = ad.cta   || '—';
+  document.getElementById('det-estado').textContent = ad.estado || '—';
+  document.getElementById('det-hookrate').textContent = ad.hook_rate ? parseFloat(ad.hook_rate).toFixed(1)+'%' : '—';
+  document.getElementById('det-holdrate').textContent = ad.hold_rate ? parseFloat(ad.hold_rate).toFixed(1)+'%' : '—';
+  document.getElementById('det-ctr').textContent   = ad.ctr  ? parseFloat(ad.ctr).toFixed(2)+'%'  : '—';
+  document.getElementById('det-roas').textContent  = ad.roas ? parseFloat(ad.roas).toFixed(2)+'x' : '—';
+  document.getElementById('modal-detalle').style.display = 'flex';
+}
+
+function cerrarDetalle() {
+  document.getElementById('modal-detalle').style.display = 'none';
+  _detalleNombre = null;
+}
+
+async function moverEstado(nombre, estado) {
+  const r = await apiPost('anuncio/estado', { nombre, estado });
+  if (r.ok) { toast(`Movido a ${estado}`, 'success'); location.reload(); }
+  else toast('Error', 'error');
+}
+
+function pedirURLPublicar(nombre) {
+  _publicarNombre = nombre;
+  document.getElementById('inp-url-publicar').value = '';
+  document.getElementById('modal-url').style.display = 'flex';
+}
+
+async function confirmarPublicar() {
+  const url = document.getElementById('inp-url-publicar').value.trim();
+  const r = await apiPost('anuncio/estado', { nombre: _publicarNombre, estado: 'Publicado', video_url: url });
+  document.getElementById('modal-url').style.display = 'none';
+  if (r.ok) { toast('Marcado como Publicado', 'success'); location.reload(); }
+  else toast('Error', 'error');
+}
+
+async function guardarMetricas() {
+  if (!_detalleNombre) return;
+  const r = await apiPost('anuncio/metricas', {
+    nombre:    _detalleNombre,
+    inversion: parseFloat(document.getElementById('inp-inversion').value) || 0,
+    compras:   parseInt(document.getElementById('inp-compras').value)    || 0,
+    ctr:       parseFloat(document.getElementById('inp-ctr').value)      || 0,
+    roas:      parseFloat(document.getElementById('inp-roas').value)     || 0,
+    hook_rate: parseFloat(document.getElementById('inp-hookrate').value) || 0,
+    hold_rate: parseFloat(document.getElementById('inp-holdrate').value) || 0,
+  });
+  if (r.ok) { cerrarDetalle(); toast('Métricas guardadas', 'success'); location.reload(); }
+  else toast('Error al guardar', 'error');
+}
+
+async function eliminarAnuncio() {
+  if (!_detalleNombre || !confirm(`¿Eliminar "${_detalleNombre}"?`)) return;
+  const r = await apiPost('anuncio/eliminar', { nombre: _detalleNombre });
+  if (r.ok) { cerrarDetalle(); toast('Anuncio eliminado', 'success'); location.reload(); }
+  else toast('Error al eliminar', 'error');
+}
+
+async function syncMeta() {
+  toast('Sincronizando...', 'info');
+  const r = await apiPost('meta/sync', {});
+  toast(r.ok ? `Sync OK: ${r.actualizados||0} anuncios` : `Error: ${r.error}`, r.ok ? 'success' : 'error');
+  if (r.ok) location.reload();
+}
+
+document.getElementById('modal-detalle').addEventListener('click', function(e) {
+  if (e.target === this) cerrarDetalle();
+});
+document.getElementById('modal-url').addEventListener('click', function(e) {
+  if (e.target === this) this.style.display = 'none';
+});
+</script>
+{% endblock %}
