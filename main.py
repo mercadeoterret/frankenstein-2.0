@@ -79,6 +79,7 @@ def base_context(request: Request, producto_sel: str = None):
 
     return {
         "request":      request,
+        "session":      request.session,  # <--- FIX: Inyectamos la sesión para Jinja2
         "master":       request.session.get("master", False),
         "productos":    productos,
         "producto_sel": sel,
