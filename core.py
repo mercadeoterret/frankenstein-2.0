@@ -30,13 +30,23 @@ ESTADO_CONFIG = {
 
 # ── Credenciales ────────────────────────────────────────
 def obtener_credenciales():
+    import json
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
+    # 1. Archivo local (desarrollo)
     if os.path.exists("credenciales.json"):
         return Credentials.from_service_account_file("credenciales.json", scopes=scopes)
-    # Render.com: variables de entorno individuales
+    # 2. Secret File de Render
+    if os.path.exists("/etc/secrets/service_account.json"):
+        return Credentials.from_service_account_file("/etc/secrets/service_account.json", scopes=scopes)
+    # 3. Variable de entorno JSON completo (Render Environment Variables)
+    sa_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "")
+    if sa_json:
+        info = json.loads(sa_json)
+        return Credentials.from_service_account_info(info, scopes=scopes)
+    # 4. Variables individuales (legacy)
     key = os.environ.get("GCP_PRIVATE_KEY", "").replace("\\n", "\n")
     if key:
         info = {
