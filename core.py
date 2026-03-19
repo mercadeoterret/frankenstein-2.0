@@ -41,7 +41,7 @@ def obtener_credenciales():
     # 2. Secret File de Render
     if os.path.exists("/etc/secrets/service_account.json"):
         return Credentials.from_service_account_file("/etc/secrets/service_account.json", scopes=scopes)
-    # 3. Variable de entorno JSON completo (Render Environment Variables)
+    # 3. Variable de entorno JSON completo
     sa_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "")
     if sa_json:
         info = json.loads(sa_json)
