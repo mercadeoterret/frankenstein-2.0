@@ -79,7 +79,7 @@ def base_context(request: Request, producto_sel: str = None):
 
     return {
         "request":      request,
-        "session":      request.session,  # <--- FIX: Inyectamos la sesión para Jinja2
+        "session":      request.session,
         "master":       request.session.get("master", False),
         "productos":    productos,
         "producto_sel": sel,
@@ -139,6 +139,9 @@ async def page_dashboard(request: Request):
     if df_ads is None:
         df_ads = load_active_ads()
         cache_set("ads", df_ads)
+    
+    # Saneamiento y blindaje
+    df_ads = df_ads.fillna("").astype(str) if not df_ads.empty else df_ads
 
     ctx["df_ads"] = df_ads.to_dict("records") if not df_ads.empty else []
     return templates.TemplateResponse("dashboard.html", ctx)
@@ -153,9 +156,14 @@ async def page_bodega(request: Request):
 
     prod = ctx["producto_sel"]
     df_prod = df[df["producto"] == prod].copy() if not df.empty else pd.DataFrame()
+    
     for col in ["genero", "descripcion", "caracteristica"]:
         if col not in df_prod.columns:
             df_prod[col] = ""
+            
+    # 🔥 Saneamiento de NaNs y forzado a String puro para Jinja2 🔥
+    if not df_prod.empty:
+        df_prod = df_prod.fillna("").astype(str)
 
     ctx["hooks"]  = df_prod[df_prod["tipo"] == "Hook"].to_dict("records") if not df_prod.empty else []
     ctx["bodies"] = df_prod[df_prod["tipo"] == "Body"].to_dict("records") if not df_prod.empty else []
@@ -185,6 +193,10 @@ async def page_mixer(request: Request):
         if col not in df_prod.columns:
             df_prod[col] = ""
 
+    # 🔥 Saneamiento de NaNs y forzado a String puro para Jinja2 🔥
+    if not df_prod.empty:
+        df_prod = df_prod.fillna("").astype(str)
+
     hooks  = df_prod[df_prod["tipo"] == "Hook"].to_dict("records") if not df_prod.empty else []
     bodies = df_prod[df_prod["tipo"] == "Body"].to_dict("records") if not df_prod.empty else []
     ctas   = df_prod[df_prod["tipo"] == "CTA"].to_dict("records")  if not df_prod.empty else []
@@ -192,7 +204,7 @@ async def page_mixer(request: Request):
     # Características únicas
     caracts = []
     if not df_prod.empty and "caracteristica" in df_prod.columns:
-        caracts = sorted([c for c in df_prod[df_prod["tipo"]=="Body"]["caracteristica"].dropna().unique()
+        caracts = sorted([c for c in df_prod[df_prod["tipo"]=="Body"]["caracteristica"].unique()
                           if str(c).strip() and str(c).lower() != "nan"])
 
     ctx.update({
@@ -210,6 +222,9 @@ async def page_produccion(request: Request):
     df_ads = df_ads if df_ads is not None else load_active_ads()
     cache_set("ads", df_ads)
     
+    # Saneamiento y blindaje
+    df_ads = df_ads.fillna("").astype(str) if not df_ads.empty else df_ads
+    
     ctx["ads"] = df_ads.to_dict("records") if not df_ads.empty else []
     return templates.TemplateResponse("produccion.html", ctx)
 
@@ -222,7 +237,7 @@ async def page_briefs(request: Request):
     if not df_briefs.empty and "producto" in df_briefs.columns:
         row = df_briefs[df_briefs["producto"] == prod]
         if not row.empty:
-            brief = row.iloc[0].to_dict()
+            brief = row.fillna("").astype(str).iloc[0].to_dict()
     ctx["brief"] = brief
     return templates.TemplateResponse("briefs.html", ctx)
 
@@ -245,6 +260,9 @@ async def page_vos(request: Request):
         return RedirectResponse("/bodega")
     df_vos = load_voice_overs()
     prod = ctx["producto_sel"]
+    
+    df_vos = df_vos.fillna("").astype(str) if not df_vos.empty else df_vos
+    
     ctx["vos"] = df_vos[df_vos["producto"]==prod].to_dict("records") if not df_vos.empty and "producto" in df_vos.columns else []
     return templates.TemplateResponse("voice_overs.html", ctx)
 
@@ -261,6 +279,8 @@ async def page_productos(request: Request):
     df_chars = df_chars if df_chars is not None else load_caracteristicas()
     cache_set("chars", df_chars)
     
+    df_chars = df_chars.fillna("").astype(str) if not df_chars.empty else df_chars
+    
     ctx["df_chars"] = df_chars.to_dict("records") if not df_chars.empty else []
     return templates.TemplateResponse("productos.html", ctx)
 
@@ -271,13 +291,13 @@ async def page_productos(request: Request):
 async def api_sheet(request: Request):
     df = load_sheet()
     cache_set("sheet", df)
-    return df.to_dict("records")
+    return df.fillna("").astype(str).to_dict("records")
 
 @app.get("/api/ads")
 async def api_ads():
     df = load_active_ads()
     cache_set("ads", df)
-    return df.to_dict("records")
+    return df.fillna("").astype(str).to_dict("records")
 
 @app.get("/api/dashboard-data")
 async def api_dashboard_data(request: Request):
@@ -293,6 +313,9 @@ async def api_dashboard_data(request: Request):
     roas_global = round(total_ing / total_inv, 2) if total_inv > 0 else 0
 
     pipeline = {e: int((df_ads["estado"] == e).sum()) for e in ESTADOS}
+
+    df_ads = df_ads.fillna("").astype(str)
+    df_pub = df_pub.fillna("").astype(str)
 
     return {
         "ads": df_ads.to_dict("records"),
@@ -315,6 +338,9 @@ async def api_bodega_data(producto: str):
     for col in ["genero", "descripcion", "caracteristica"]:
         if col not in df_prod.columns:
             df_prod[col] = ""
+            
+    df_prod = df_prod.fillna("").astype(str)
+    
     return {
         "hooks":  df_prod[df_prod["tipo"] == "Hook"].to_dict("records"),
         "bodies": df_prod[df_prod["tipo"] == "Body"].to_dict("records"),
@@ -412,7 +438,7 @@ async def api_meta_import_csv(request: Request, file: UploadFile = File(...)):
         df_meta["roas"]       = pd.to_numeric(df_meta["Results ROAS"],   errors="coerce").fillna(0)
         df_meta["compras"]    = pd.to_numeric(df_meta["Resultados"],     errors="coerce").fillna(0)
 
-        df_valido = df_meta[df_meta["inversion"] > 0].copy()
+        df_valido = df_meta[df_meta["inversion"] > 0].copy().fillna("").astype(str)
 
         # Preview para el frontend
         preview = df_valido[["Nombre del anuncio","inversion","compras","ctr","hook_rate","hold_rate","roas"]].to_dict("records")
