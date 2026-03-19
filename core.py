@@ -12,8 +12,10 @@ import requests
 from google.oauth2.service_account import Credentials
 
 # ── Configuración global ────────────────────────────────
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/19ae5_2AFNAc8V_CvbuaXl_MWI4OON5EiwJEWDUPiBTM/export?format=csv&gid=0"
-SHEET_ID             = "19ae5_2AFNAc8V_CvbuaXl_MWI4OON5EiwJEWDUPiBTM"
+# 🔥 NUEVO SHEET DE PRUEBAS 🔥
+SHEET_ID             = "1VRMfFBHNjMkGYvzOuZKqXFRKK-p1fW47KiBQkiugUCc"
+GOOGLE_SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
+
 MASTER_PASSWORD      = "terret2024"
 DRIVE_ROOT_FOLDER_ID = "0AB2EtnClHpnrUk9PVA"
 SHARED_DRIVE_ID      = "0AB2EtnClHpnrUk9PVA"
@@ -562,7 +564,7 @@ def obtener_metricas_meta(access_token=None, ad_account_id=None) -> dict:
             v75  = _get_video("video_p75_watched_actions")
             v100 = _get_video("video_p100_watched_actions")
 
-            roas           = round(valor   / spend       * 1, 2) if spend > 0       else 0
+            roas           = round(valor   / spend        * 1, 2) if spend > 0        else 0
             ctr            = round(clicks  / impressions * 100, 2) if impressions > 0 else 0
             hook_rate      = round(v3s     / impressions * 100, 2) if impressions > 0 else 0
             hold_rate      = round(v25     / impressions * 100, 2) if impressions > 0 else 0
