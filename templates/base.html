@@ -9,7 +9,6 @@
 <body>
 
 {% if not session.get("authenticated") %}
-<!-- ── Auth Overlay ── -->
 <div class="auth-overlay" id="auth-overlay">
   <div class="auth-box">
     <div class="auth-logo">
@@ -35,7 +34,6 @@
 
 <div class="app-shell">
 
-  <!-- ── Sidebar ── -->
   <aside class="sidebar">
     <div class="sidebar-logo">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 438.53 94.81" style="width:90px;height:auto;">
@@ -61,41 +59,41 @@
     <div class="sidebar-section" style="flex:1;">
       <div class="sidebar-label">Navegación</div>
       <nav>
-        <a class="nav-item" data-page="bodega" href="/bodega" onclick="navigate('bodega');return false;">
+        <a class="nav-item" data-page="bodega" href="/bodega">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1"/><path d="M5 3V2M11 3V2"/></svg>
           Bodega
         </a>
 
         {% if master %}
-        <a class="nav-item" data-page="dashboard" href="/dashboard" onclick="navigate('dashboard');return false;">
+        <a class="nav-item" data-page="dashboard" href="/dashboard">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="0.5"/><rect x="9" y="2" width="5" height="5" rx="0.5"/><rect x="2" y="9" width="5" height="5" rx="0.5"/><rect x="9" y="9" width="5" height="5" rx="0.5"/></svg>
           Dashboard
         </a>
-        <a class="nav-item" data-page="mixer" href="/mixer" onclick="navigate('mixer');return false;">
+        <a class="nav-item" data-page="mixer" href="/mixer">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8h12M5 4l-3 4 3 4M11 4l3 4-3 4"/></svg>
           Mixer
         </a>
         {% endif %}
 
-        <a class="nav-item" data-page="produccion" href="/produccion" onclick="navigate('produccion');return false;">
+        <a class="nav-item" data-page="produccion" href="/produccion">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h8M2 12h10"/></svg>
           Producción
         </a>
-        <a class="nav-item" data-page="briefs" href="/briefs" onclick="navigate('briefs');return false;">
+        <a class="nav-item" data-page="briefs" href="/briefs">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h8a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1zM5 6h6M5 9h4"/></svg>
           Briefs
         </a>
 
         {% if master %}
-        <a class="nav-item" data-page="subir" href="/subir" onclick="navigate('subir');return false;">
+        <a class="nav-item" data-page="subir" href="/subir">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 11V5M5 8l3-3 3 3"/><path d="M3 13h10"/></svg>
           Subir video
         </a>
-        <a class="nav-item" data-page="voice-overs" href="/voice-overs" onclick="navigate('voice-overs');return false;">
+        <a class="nav-item" data-page="voice-overs" href="/voice-overs">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="6" r="3"/><path d="M4 10s1 4 4 4 4-4 4-4"/></svg>
           Voice Overs
         </a>
-        <a class="nav-item" data-page="productos" href="/productos" onclick="navigate('productos');return false;">
+        <a class="nav-item" data-page="productos" href="/productos">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="1"/><path d="M8 5v6M5 8h6"/></svg>
           Productos
         </a>
@@ -118,7 +116,6 @@
     </div>
   </aside>
 
-  <!-- ── Main ── -->
   <main class="main">
     <div class="topbar">
       <div>
